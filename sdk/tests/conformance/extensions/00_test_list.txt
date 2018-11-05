@@ -1,5 +1,6 @@
 --min-version 1.0.3 --max-version 1.9.9 angle-instanced-arrays.html
 --min-version 1.0.3 --max-version 1.9.9 angle-instanced-arrays-out-of-bounds.html
+--min-version 1.0.3 angle-multi-draw.html
 --min-version 1.0.3 --max-version 1.9.9 ext-blend-minmax.html
 --min-version 1.0.4 ext-texture-compression-bptc.html
 --min-version 1.0.4 ext-texture-compression-rgtc.html
