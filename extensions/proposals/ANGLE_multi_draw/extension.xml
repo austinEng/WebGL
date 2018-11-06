@@ -17,14 +17,14 @@
   </depends>
 
   <overview>
-    <mirrors href="http://www.khronos.org/registry/gles/extensions/ANGLE/ANGLE_multi_draw.txt" name="ANGLE_multi_draw">
+    <mirrors href="https://chromium.googlesource.com/angle/angle/+/master/extensions/ANGLE_multi_draw.txt" name="ANGLE_multi_draw">
       <addendum>
         The implementation must validate the arrays and indices referenced by <code>multiDrawArraysANGLE</code>, <code>multiDrawElementsANGLE</code>, <code>multiDrawArraysInstancedANGLE</code>, and <code>multiDrawElementsInstancedANGLE</code> similarly to how indices referenced by <code>drawArrays</code> and <code>drawElements</code> are validated according to section
         <a href="http://www.khronos.org/registry/webgl/specs/1.0/#ATTRIBS_AND_RANGE_CHECKING">Enabled Vertex Attributes and Range Checking</a> of the
         WebGL specification.
       </addendum>
     </mirrors>
-    <p>Although the extension contains ANGLE in the name it may be exposed by any implementation, whether or not the implementation uses the ANGLE library.</p>
+    <p>Although the extension contains ANGLE in the name, it may be exposed by any implementation, whether or not the implementation uses the ANGLE library.</p>
     <div class="nonnormative">
       <p>This extension provides Multi* draw call variants. On WebGL 2.0 contexts or WebGL 1.0 contexts that support ANGLE_instanced_arrays, it also provides Multi* instanced draw call variants.</p>
 
@@ -36,15 +36,17 @@
     <features>
       <feature>The <code>*Offset</code> arguments to the new entry points choose the starting offset into their respective typed arrays or sequences. This primarily avoids allocation of temporary typed array views.</feature>
 
-      <feature>The <code>multiDrawArraysANGLE</code> and <code>multiDrawElementsANGLE</code> entry points are added. These provide a counterpoint to instanced rendering and are more flexible for certain scenarios. They behave as to multiple calls to <code>drawArrays</code> and <code>drawElements</code> except they handle multiple lists of arguments in one call.</feature>
+      <feature>The <code>multiDrawArraysANGLE</code> and <code>multiDrawElementsANGLE</code> entry points are added. These provide a counterpoint to instanced rendering and are more flexible for certain scenarios. They behave identically to multiple calls to <code>drawArrays</code> and <code>drawElements</code> except they handle multiple lists of arguments in one call.</feature>
 
-      <feature>The <code>gl_DrawID</code> builtin is added to the shading language. For any Multi* draw call variant, the index of the draw <code>i</code> may be read by the vertex shader as <code>gl_DrawID</code>.</feature>
+      <feature>The <code>gl_DrawID</code> builtin is added to the shading language. For any Multi* draw call variant, the index of the draw <code>i</code> may be read by the vertex shader as <code>gl_DrawID</code>. For non Multi* calls, the value of gl_DrawID is 0.</feature>
       <glsl extname="GL_ANGLE_multi_draw">
         <stage type="vertex"/>
         <input name="gl_DrawID" type="int" />
       </glsl>
 
-      <feature>On WebGL 2.0 contexts or WebGL 1.0 contexts that support ANGLE_instanced_arrays, all previously stated features are added. Furthermore, the <code>multiDrawArraysInstancedANGLE</code> and <code>multiDrawElementsInstancedANGLE</code> entry points are added. On WebGL 2.0 contexts, they behave as to multiple calls to <code>drawArraysInstanced</code> and <code>drawElementsInstanced</code> except they handle multiple lists of arguments in one call. On WebGL 1.0 contexts that support ANGLE_instanced_arrays, they behave as to multiple calls to <code>drawArraysInstancedANGLE</code> and <code>drawElementsInstancedANGLE</code> except they handle multiple lists of arguments in one call.</feature>
+      <feature>On WebGL 2.0 contexts or WebGL 1.0 contexts that support <code>ANGLE_instanced_arrays</code>, all previously stated features are added. Furthermore, the <code>multiDrawArraysInstancedANGLE</code> and <code>multiDrawElementsInstancedANGLE</code> entry points are added. On WebGL 2.0 contexts, they behave identically to multiple calls to <code>drawArraysInstanced</code> and <code>drawElementsInstanced</code> except they handle multiple lists of arguments in one call. On WebGL 1.0 contexts that support ANGLE_instanced_arrays, they behave identically to multiple calls to <code>drawArraysInstancedANGLE</code> and <code>drawElementsInstancedANGLE</code> except they handle multiple lists of arguments in one call.</feature>
+
+      <feature>On WebGL 2.0 contexts or WebGL 1.0 contexts that support <code>ANGLE_instanced_arrays</code>, <code>getExtension</code> returns <code>ANGLE_multi_draw_2</code> (detailed below). Otherwise, <code>ANGLE_multi_draw_1</code> (detailed below) is returned. Enabling <code>ANGLE_multi_draw</code> does not affect <code>ANGLE_instanced_arrays</code>, and likewise, enabling <code>ANGLE_instanced_arrays</code> does not affect <code>ANGLE_multi_draw</code>. Although <code>ANGLE_multi_draw_2</code> is dependent on <code>ANGLE_instanced_arrays</code> on WebGL 1.0 contexts, it is returned from <code>getExtension</code> if <code>ANGLE_instanced_arrays</code> is also supported, regardless of whether or not <code>ANGLE_instanced_arrays</code> is enabled. Furthermore, requesting <code>ANGLE_multi_draw</code> does not implicitly enable <code>ANGLE_instanced_arrays</code>.</feature>
     </features>
   </overview>
 
