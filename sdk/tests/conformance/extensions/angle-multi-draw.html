@@ -159,19 +159,8 @@ function runTest() {
   // does not affect ANGLE_multi_draw
   let instancedExt;
 
-  function getContextVersion() {
-    if (typeof WebGLRenderingContext !== "undefined" && gl instanceof WebGLRenderingContext) {
-      return 1;
-    } else if (typeof WebGL2RenderingContext !== "undefined" &&  gl instanceof WebGL2RenderingContext) {
-      return 2;
-    } else {
-      testFailed('Unsupported rendering context');
-      throw 'Unsupported rendering context';
-    }
-  }
-
   function hasInstancing() {
-    return (getContextVersion() == 2 ||
+    return (wtu.getDefault3DContextVersion() == 2 ||
             gl.getSupportedExtensions().indexOf('ANGLE_instanced_arrays') >= 0);
   }
 
@@ -266,7 +255,7 @@ function runTest() {
       gl.bindBuffer(gl.ARRAY_BUFFER, instanceBuffer);
       gl.enableVertexAttribArray(1);
       gl.vertexAttribPointer(1, 1, gl.FLOAT, false, 0, 0);
-      if (getContextVersion() < 2) {
+      if (wtu.getDefault3DContextVersion() < 2) {
         instancedExt.vertexAttribDivisorANGLE(1, 1);
       } else {
         gl.vertexAttribDivisor(1, 1);
@@ -604,7 +593,7 @@ function runTest() {
     }
 
     function drawArraysInstanced() {
-      if (getContextVersion() < 2) {
+      if (wtu.getDefault3DContextVersion() < 2) {
         instancedExt.drawArraysInstancedANGLE.apply(instancedExt, arguments);
       } else {
         gl.drawArraysInstanced.apply(gl, arguments);
@@ -612,7 +601,7 @@ function runTest() {
     }
 
     function drawElementsInstanced() {
-      if (getContextVersion() < 2) {
+      if (wtu.getDefault3DContextVersion() < 2) {
         instancedExt.drawElementsInstancedANGLE.apply(instancedExt, arguments);
       } else {
         gl.drawElementsInstanced.apply(gl, arguments);
@@ -620,7 +609,7 @@ function runTest() {
     }
 
     function vertexAttribDivisor(attrib, divisor) {
-      if (getContextVersion() < 2) {
+      if (wtu.getDefault3DContextVersion() < 2) {
         instancedExt.vertexAttribDivisorANGLE(attrib, divisor);
       } else {
         gl.vertexAttribDivisor(attrib, divisor);
