@@ -145,7 +145,28 @@ description("This test verifies the functionality of the ANGLE_multi_draw extens
 const wtu = WebGLTestUtils;
 const canvas = document.getElementById("canvas");
 const gl = wtu.create3DContext(canvas);
-var ext;
+const instancedExt = gl && gl.getExtension('ANGLE_instanced_arrays');
+
+// Check if the extension is either both enabled and supported or
+// not enabled and not supported.
+function runSupportedTest(extensionName, extensionEnabled) {
+  const supported = gl.getSupportedExtensions();
+  if (supported.indexOf(extensionName) >= 0) {
+    if (extensionEnabled) {
+      testPassed(extensionName + ' listed as supported and getExtension succeeded');
+      return true;
+    } else {
+      testFailed(extensionName + ' listed as supported but getExtension failed');
+    }
+  } else {
+    if (extensionEnabled) {
+      testFailed(extensionName + ' not listed as supported but getExtension succeeded');
+    } else {
+      testPassed(extensionName + ' not listed as supported and getExtension failed -- this is legal');
+    }
+  }
+  return false;
+}
 
 function runTest() {
   if (!gl) {
@@ -154,55 +175,15 @@ function runTest() {
     }
   }
 
-  const multiDrawExt = gl.getExtension('ANGLE_multi_draw');
-  // Defined later. We test that requesting ANGLE_instanced_arrays
-  // does not affect ANGLE_multi_draw
-  let instancedExt;
+  doTest('WEBGL_multi_draw', false);
+  doTest('WEBGL_multi_draw_instanced', true);
+}
 
-  function hasInstancing() {
-    return (wtu.getDefault3DContextVersion() == 2 ||
-            gl.getSupportedExtensions().indexOf('ANGLE_instanced_arrays') >= 0);
-  }
+function doTest(extensionName, instanced) {
+  const ext = gl.getExtension(extensionName);
 
-  // Check if the extension is either both enabled and supported or
-  // not enabled and not supported.
-  function runSupportedTest(extensionEnabled) {
-    const supported = gl.getSupportedExtensions();
-    if (supported.indexOf('ANGLE_multi_draw') >= 0) {
-      if (extensionEnabled) {
-        testPassed('ANGLE_multi_draw listed as supported and getExtension succeeded');
-        return true;
-      } else {
-        testFailed('ANGLE_multi_draw listed as supported but getExtension failed');
-      }
-    } else {
-      if (extensionEnabled) {
-        testFailed('ANGLE_multi_draw not listed as supported but getExtension succeeded');
-      } else {
-        testPassed('ANGLE_multi_draw not listed as supported and getExtension failed -- this is legal');
-      }
-    }
-    return false;
-  }
-
-  function runHasEntrypointsTests() {
-    ext = multiDrawExt;
-    shouldNotBe('ext.multiDrawArraysANGLE', 'undefined');
-    shouldNotBe('ext.multiDrawElementsANGLE', 'undefined');
-    if (hasInstancing()) {
-      shouldNotBe('ext.multiDrawArraysInstancedANGLE', 'undefined');
-      shouldNotBe('ext.multiDrawElementsInstancedANGLE', 'undefined');
-    } else {
-      shouldBe('ext.multiDrawArraysInstancedANGLE', 'undefined');
-      shouldBe('ext.multiDrawElementsInstancedANGLE', 'undefined');
-    }
-  }
-
-  function runExtensionDependencyTests() {
-      // Available entrypoints should not change
-      runHasEntrypointsTests();
-      instancedExt = gl.getExtension('ANGLE_instanced_arrays');
-      runHasEntrypointsTests();
+  if (!runSupportedTest(extensionName, ext)) {
+    return;
   }
 
   function runValidationTests() {
@@ -220,23 +201,6 @@ function runTest() {
 
     const program = wtu.setupProgram(gl, ["vshaderNoDrawID", "fshader"], ["vPosition", "vInstance"], [0, 1]);
     expectTrue(program != null, "can compile simple program");
-
-    // Wrap a draw call in a function to setup the draw call, execute,
-    // and check errors.
-    // The `drawFunc` is one of the extension entrypoints being tested. It may
-    // be undefined if that entrypoint is not supported on the context
-    function makeDrawCheck(drawFunc, setup) {
-      if (!drawFunc) {
-        return function() {};
-      }
-      return function(f_args, expect, msg) {
-        setup();
-        drawFunc.apply(multiDrawExt, f_args);
-        wtu.glErrorShouldBe(gl, expect, drawFunc.name + " " + msg);
-        gl.disableVertexAttribArray(0);
-        gl.disableVertexAttribArray(1);
-      }
-    }
 
     function setupDrawArrays() {
       gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
@@ -272,89 +236,121 @@ function runTest() {
       setupInstanced();
     }
 
-    const checkMultiDrawArrays = makeDrawCheck(multiDrawExt.multiDrawArraysANGLE, setupDrawArrays);
-    const checkMultiDrawElements = makeDrawCheck(multiDrawExt.multiDrawElementsANGLE, setupDrawElements);
-    const checkMultiDrawArraysInstanced = makeDrawCheck(multiDrawExt.multiDrawArraysInstancedANGLE, setupDrawArraysInstanced);
-    const checkMultiDrawElementsInstanced = makeDrawCheck(multiDrawExt.multiDrawElementsInstancedANGLE, setupDrawElementsInstanced);
+    // Wrap a draw call in a function to setup the draw call, execute,
+    // and check errors.
+    // The `drawFunc` is one of the extension entrypoints being tested. It may
+    // be undefined if that entrypoint is not supported on the context
+    function makeDrawCheck(drawFunc, setup) {
+      if (!drawFunc) {
+        return function() {};
+      }
+      return function(f_args, expect, msg) {
+        setup();
+        drawFunc.apply(ext, f_args);
+        wtu.glErrorShouldBe(gl, expect, drawFunc.name + " " + msg);
+        gl.disableVertexAttribArray(0);
+        gl.disableVertexAttribArray(1);
+      }
+    }
+
+    const checkMultiDrawArrays = makeDrawCheck(
+        ext.multiDrawArraysWEBGL, setupDrawArrays);
+    const checkMultiDrawElements = makeDrawCheck(
+        ext.multiDrawElementsWEBGL, setupDrawElements);
+    const checkMultiDrawArraysInstanced = makeDrawCheck(
+        ext.multiDrawArraysInstancedWEBGL, setupDrawArraysInstanced);
+    const checkMultiDrawElementsInstanced = makeDrawCheck(
+        ext.multiDrawElementsInstancedWEBGL, setupDrawElementsInstanced);
 
     gl.useProgram(program);
 
     // Check that drawing a single triangle works
-    checkMultiDrawArrays(
-      [gl.TRIANGLES, [0], 0, [3], 0, 1],
-      gl.NO_ERROR, "with gl.TRIANGLES");
-    checkMultiDrawElements(
-      [gl.TRIANGLES, [3], 0, gl.UNSIGNED_BYTE, [0], 0, 1],
-      gl.NO_ERROR, "with gl.TRIANGLES");
-    checkMultiDrawElementsInstanced(
-      [gl.TRIANGLES, [3], 0, gl.UNSIGNED_BYTE, [0], 0, [1], 0, 1],
-      gl.NO_ERROR, "with gl.TRIANGLES");
-    checkMultiDrawArraysInstanced(
-      [gl.TRIANGLES, [0], 0, [3], 0, [1], 0, 1],
-      gl.NO_ERROR, "with gl.TRIANGLES");
+    if (!instanced) {
+      checkMultiDrawArrays(
+        [gl.TRIANGLES, [0], 0, [3], 0, 1],
+        gl.NO_ERROR, "with gl.TRIANGLES");
+      checkMultiDrawElements(
+        [gl.TRIANGLES, [3], 0, gl.UNSIGNED_BYTE, [0], 0, 1],
+        gl.NO_ERROR, "with gl.TRIANGLES");
+    } else {
+      checkMultiDrawElementsInstanced(
+        [gl.TRIANGLES, [3], 0, gl.UNSIGNED_BYTE, [0], 0, [1], 0, 1],
+        gl.NO_ERROR, "with gl.TRIANGLES");
+      checkMultiDrawArraysInstanced(
+        [gl.TRIANGLES, [0], 0, [3], 0, [1], 0, 1],
+        gl.NO_ERROR, "with gl.TRIANGLES");
+    }
 
     // Zero drawcount permitted
-    checkMultiDrawArrays(
-      [gl.TRIANGLES, [0], 0, [3], 0, 0],
-      gl.NO_ERROR, "with drawcount == 0");
-    checkMultiDrawElements(
-      [gl.TRIANGLES, [3], 0, gl.UNSIGNED_BYTE, [0], 0, 0],
-      gl.NO_ERROR, "with drawcount == 0");
-    checkMultiDrawElementsInstanced(
-      [gl.TRIANGLES, [3], 0, gl.UNSIGNED_BYTE, [0], 0, [1], 0, 0],
-      gl.NO_ERROR, "with drawcount == 0");
-    checkMultiDrawArraysInstanced(
-      [gl.TRIANGLES, [0], 0, [3], 0, [1], 0, 0],
-      gl.NO_ERROR, "with drawcount == 0");
+    if (!instanced) {
+      checkMultiDrawArrays(
+        [gl.TRIANGLES, [0], 0, [3], 0, 0],
+        gl.NO_ERROR, "with drawcount == 0");
+      checkMultiDrawElements(
+        [gl.TRIANGLES, [3], 0, gl.UNSIGNED_BYTE, [0], 0, 0],
+        gl.NO_ERROR, "with drawcount == 0");
+    } else {
+      checkMultiDrawElementsInstanced(
+        [gl.TRIANGLES, [3], 0, gl.UNSIGNED_BYTE, [0], 0, [1], 0, 0],
+        gl.NO_ERROR, "with drawcount == 0");
+      checkMultiDrawArraysInstanced(
+        [gl.TRIANGLES, [0], 0, [3], 0, [1], 0, 0],
+        gl.NO_ERROR, "with drawcount == 0");
+    }
 
     // Check negative drawcount
-    checkMultiDrawArrays(
-      [gl.TRIANGLES, [0], 0, [3], 0, -1],
-      gl.INVALID_VALUE, "with drawcount < 0");
-    checkMultiDrawElements(
-      [gl.TRIANGLES, [3], 0, gl.UNSIGNED_BYTE, [0], 0, -1],
-      gl.INVALID_VALUE, "with drawcount < 0");
-    checkMultiDrawElementsInstanced(
-      [gl.TRIANGLES, [3], 0, gl.UNSIGNED_BYTE, [0], 0, [1], 0, -1],
-      gl.INVALID_VALUE, "with drawcount < 0");
-    checkMultiDrawArraysInstanced(
-      [gl.TRIANGLES, [0], 0, [3], 0, [1], 0, -1],
-      gl.INVALID_VALUE, "with drawcount < 0");
+    if (!instanced) {
+      checkMultiDrawArrays(
+        [gl.TRIANGLES, [0], 0, [3], 0, -1],
+        gl.INVALID_VALUE, "with drawcount < 0");
+      checkMultiDrawElements(
+        [gl.TRIANGLES, [3], 0, gl.UNSIGNED_BYTE, [0], 0, -1],
+        gl.INVALID_VALUE, "with drawcount < 0");
+    } else {
+      checkMultiDrawElementsInstanced(
+        [gl.TRIANGLES, [3], 0, gl.UNSIGNED_BYTE, [0], 0, [1], 0, -1],
+        gl.INVALID_VALUE, "with drawcount < 0");
+      checkMultiDrawArraysInstanced(
+        [gl.TRIANGLES, [0], 0, [3], 0, [1], 0, -1],
+        gl.INVALID_VALUE, "with drawcount < 0");
+    }
 
     // Check offsets greater than array length
-    checkMultiDrawArrays(
-      [gl.TRIANGLES, [0], 1, [3], 0, 1],
-      gl.INVALID_OPERATION, "with firstsStart >= firstsList.length");
-    checkMultiDrawArrays(
-      [gl.TRIANGLES, [0], 0, [3], 1, 1],
-      gl.INVALID_OPERATION, "with countsStart >= countsList.length");
+    if (!instanced) {
+      checkMultiDrawArrays(
+        [gl.TRIANGLES, [0], 1, [3], 0, 1],
+        gl.INVALID_OPERATION, "with firstsStart >= firstsList.length");
+      checkMultiDrawArrays(
+        [gl.TRIANGLES, [0], 0, [3], 1, 1],
+        gl.INVALID_OPERATION, "with countsStart >= countsList.length");
 
-    checkMultiDrawElements(
-      [gl.TRIANGLES, [3], 1, gl.UNSIGNED_BYTE, [0], 0, 1],
-      gl.INVALID_OPERATION, "with countsStart >= countsList.length");
-    checkMultiDrawElements(
-      [gl.TRIANGLES, [3], 0, gl.UNSIGNED_BYTE, [0], 1, 1],
-      gl.INVALID_OPERATION, "with offsetsStart >= offsetsList.length");
+      checkMultiDrawElements(
+        [gl.TRIANGLES, [3], 1, gl.UNSIGNED_BYTE, [0], 0, 1],
+        gl.INVALID_OPERATION, "with countsStart >= countsList.length");
+      checkMultiDrawElements(
+        [gl.TRIANGLES, [3], 0, gl.UNSIGNED_BYTE, [0], 1, 1],
+        gl.INVALID_OPERATION, "with offsetsStart >= offsetsList.length");
+    } else {
+      checkMultiDrawArraysInstanced(
+        [gl.TRIANGLES, [0], 1, [3], 0, [1], 0, 1],
+        gl.INVALID_OPERATION, "with firstsStart >= firstsList.length");
+      checkMultiDrawArraysInstanced(
+        [gl.TRIANGLES, [0], 0, [3], 1, [1], 0, 1],
+        gl.INVALID_OPERATION, "with countsStart >= countsList.length");
+      checkMultiDrawArraysInstanced(
+        [gl.TRIANGLES, [0], 0, [3], 0, [1], 1, 1],
+        gl.INVALID_OPERATION, "with instanceCountsStart >= instanceCountsList.length");
 
-    checkMultiDrawArraysInstanced(
-      [gl.TRIANGLES, [0], 1, [3], 0, [1], 0, 1],
-      gl.INVALID_OPERATION, "with firstsStart >= firstsList.length");
-    checkMultiDrawArraysInstanced(
-      [gl.TRIANGLES, [0], 0, [3], 1, [1], 0, 1],
-      gl.INVALID_OPERATION, "with countsStart >= countsList.length");
-    checkMultiDrawArraysInstanced(
-      [gl.TRIANGLES, [0], 0, [3], 0, [1], 1, 1],
-      gl.INVALID_OPERATION, "with instanceCountsStart >= instanceCountsList.length");
-
-    checkMultiDrawElementsInstanced(
-      [gl.TRIANGLES, [3], 1, gl.UNSIGNED_BYTE, [0], 0, [1], 0, 1],
-      gl.INVALID_OPERATION, "with countsStart >= countsList.length");
-    checkMultiDrawElementsInstanced(
-      [gl.TRIANGLES, [3], 0, gl.UNSIGNED_BYTE, [0], 1, [1], 0, 1],
-      gl.INVALID_OPERATION, "with offsetsStart >= offsetsList.length");
-    checkMultiDrawElementsInstanced(
-      [gl.TRIANGLES, [3], 0, gl.UNSIGNED_BYTE, [0], 0, [1], 1, 1],
-      gl.INVALID_OPERATION, "with instanceCountsStart >= instanceCountsList.length");
+      checkMultiDrawElementsInstanced(
+        [gl.TRIANGLES, [3], 1, gl.UNSIGNED_BYTE, [0], 0, [1], 0, 1],
+        gl.INVALID_OPERATION, "with countsStart >= countsList.length");
+      checkMultiDrawElementsInstanced(
+        [gl.TRIANGLES, [3], 0, gl.UNSIGNED_BYTE, [0], 1, [1], 0, 1],
+        gl.INVALID_OPERATION, "with offsetsStart >= offsetsList.length");
+      checkMultiDrawElementsInstanced(
+        [gl.TRIANGLES, [3], 0, gl.UNSIGNED_BYTE, [0], 0, [1], 1, 1],
+        gl.INVALID_OPERATION, "with instanceCountsStart >= instanceCountsList.length");
+    }
   }
 
   function runShaderTests() {
@@ -362,6 +358,7 @@ function runTest() {
     expectTrue(illegalProgram == null, "cannot compile program with gl_DrawID but no extension directive");
 
     const drawIDProgram = wtu.setupProgram(gl, ["vshaderDrawIDZero", "fshader"], ["vPosition"], [0]);
+    wtu.setupProgram(gl, ["vshaderDrawIDZero", "fshader"], ["vPosition"], [0]);
     expectTrue(drawIDProgram !== null, "can compile program with gl_DrawID");
     gl.useProgram(drawIDProgram);
     gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer());
@@ -531,39 +528,35 @@ function runTest() {
     let drawIDLocation;
 
     const multiDrawArrays = function() {
-      multiDrawExt.multiDrawArraysANGLE(gl.TRIANGLES, firsts, 0, counts, 0, tri_count);
+      ext.multiDrawArraysWEBGL(gl.TRIANGLES, firsts, 0, counts, 0, tri_count);
     }
 
     const multiDrawArraysWithNonzeroOffsets = function() {
-      multiDrawExt.multiDrawArraysANGLE(gl.TRIANGLES, buffer, firstsOffset, buffer, countsOffset, tri_count);
+      ext.multiDrawArraysWEBGL(gl.TRIANGLES, buffer, firstsOffset, buffer, countsOffset, tri_count);
     }
 
     const multiDrawElements = function() {
-      multiDrawExt.multiDrawElementsANGLE(gl.TRIANGLES, counts, 0, gl.UNSIGNED_SHORT, offsets, 0, tri_count);
+      ext.multiDrawElementsWEBGL(gl.TRIANGLES, counts, 0, gl.UNSIGNED_SHORT, offsets, 0, tri_count);
     }
 
     const multiDrawElementsWithNonzeroOffsets = function() {
-      multiDrawExt.multiDrawElementsANGLE(gl.TRIANGLES, buffer, countsOffset, gl.UNSIGNED_SHORT, buffer, offsetsOffset, tri_count);
+      ext.multiDrawElementsWEBGL(gl.TRIANGLES, buffer, countsOffset, gl.UNSIGNED_SHORT, buffer, offsetsOffset, tri_count);
     }
 
     const multiDrawArraysInstanced = function() {
-      if (!multiDrawExt.multiDrawArraysInstancedANGLE) return;
-      multiDrawExt.multiDrawArraysInstancedANGLE(gl.TRIANGLES, firsts, 0, counts, 0, instances, 0, tri_count);
+      ext.multiDrawArraysInstancedWEBGL(gl.TRIANGLES, firsts, 0, counts, 0, instances, 0, tri_count);
     }
 
     const multiDrawArraysInstancedWithNonzeroOffsets = function() {
-      if (!multiDrawExt.multiDrawArraysInstancedANGLE) return;
-      multiDrawExt.multiDrawArraysInstancedANGLE(gl.TRIANGLES, buffer, firstsOffset, buffer, countsOffset, buffer, instancesOffset, tri_count);
+      ext.multiDrawArraysInstancedWEBGL(gl.TRIANGLES, buffer, firstsOffset, buffer, countsOffset, buffer, instancesOffset, tri_count);
     }
 
     const multiDrawElementsInstanced = function() {
-      if (!multiDrawExt.multiDrawElementsInstancedANGLE) return;
-      multiDrawExt.multiDrawElementsInstancedANGLE(gl.TRIANGLES, counts, 0, gl.UNSIGNED_SHORT, offsets, 0, instances, 0, tri_count);
+      ext.multiDrawElementsInstancedWEBGL(gl.TRIANGLES, counts, 0, gl.UNSIGNED_SHORT, offsets, 0, instances, 0, tri_count);
     }
 
     const multiDrawElementsInstancedWithNonzeroOffsets = function() {
-      if (!multiDrawExt.multiDrawElementsInstancedANGLE) return;
-      multiDrawExt.multiDrawElementsInstancedANGLE(gl.TRIANGLES, buffer, countsOffset, gl.UNSIGNED_SHORT, buffer, offsetsOffset, buffer, instancesOffset, tri_count);
+      ext.multiDrawElementsInstancedWEBGL(gl.TRIANGLES, buffer, countsOffset, gl.UNSIGNED_SHORT, buffer, offsetsOffset, buffer, instancesOffset, tri_count);
     }
 
     const manyDrawArrays = function() {
@@ -680,35 +673,35 @@ function runTest() {
     if (noDrawIDProgram) {
       gl.useProgram(noDrawIDProgram);
 
-      checkDraw({
-        drawFunc: multiDrawArrays,
-        drawID: false,
-      });
-      checkDraw({
-        drawFunc: multiDrawArraysWithNonzeroOffsets,
-        drawID: false,
-      });
-      checkDraw({
-        drawFunc: multiDrawElements,
-        indexed: true,
-        drawID: false,
-      });
-      checkDraw({
-        drawFunc: multiDrawElementsWithNonzeroOffsets,
-        indexed: true,
-        drawID: false,
-      });
-      checkDraw({
-        drawFunc: manyDrawArrays,
-        drawID: false,
-      });
-      checkDraw({
-        drawFunc: manyDrawElements,
-        indexed: true,
-        drawID: false,
-      });
-
-      if (hasInstancing()) {
+      if (!instanced) {
+        checkDraw({
+          drawFunc: multiDrawArrays,
+          drawID: false,
+        });
+        checkDraw({
+          drawFunc: multiDrawArraysWithNonzeroOffsets,
+          drawID: false,
+        });
+        checkDraw({
+          drawFunc: multiDrawElements,
+          indexed: true,
+          drawID: false,
+        });
+        checkDraw({
+          drawFunc: multiDrawElementsWithNonzeroOffsets,
+          indexed: true,
+          drawID: false,
+        });
+        checkDraw({
+          drawFunc: manyDrawArrays,
+          drawID: false,
+        });
+        checkDraw({
+          drawFunc: manyDrawElements,
+          indexed: true,
+          drawID: false,
+        });
+      } else {
         checkDraw({
           drawFunc: multiDrawArraysInstanced,
           drawID: false,
@@ -750,26 +743,26 @@ function runTest() {
     if (withDrawIDProgram) {
       gl.useProgram(withDrawIDProgram);
 
-      checkDraw({
-        drawFunc: multiDrawArrays,
-        drawID: true,
-      });
-      checkDraw({
-        drawFunc: multiDrawArraysWithNonzeroOffsets,
-        drawID: true,
-      });
-      checkDraw({
-        drawFunc: multiDrawElements,
-        indexed: true,
-        drawID: true,
-      });
-      checkDraw({
-        drawFunc: multiDrawElementsWithNonzeroOffsets,
-        indexed: true,
-        drawID: true,
-      });
-
-      if (hasInstancing()) {
+      if (!instanced) {
+        checkDraw({
+          drawFunc: multiDrawArrays,
+          drawID: true,
+        });
+        checkDraw({
+          drawFunc: multiDrawArraysWithNonzeroOffsets,
+          drawID: true,
+        });
+        checkDraw({
+          drawFunc: multiDrawElements,
+          indexed: true,
+          drawID: true,
+        });
+        checkDraw({
+          drawFunc: multiDrawElementsWithNonzeroOffsets,
+          indexed: true,
+          drawID: true,
+        });
+      } else {
         checkDraw({
           drawFunc: multiDrawArraysInstanced,
           drawID: true,
@@ -801,17 +794,17 @@ function runTest() {
     if (emulatedDrawIDProgram) {
       gl.useProgram(emulatedDrawIDProgram);
 
-      checkDraw({
-        drawFunc: manyDrawArraysEmulateDrawID,
-        drawID: true,
-      });
-      checkDraw({
-        drawFunc: manyDrawElementsEmulateDrawID,
-        indexed: true,
-        drawID: true,
-      });
-
-      if (hasInstancing()) {
+      if (!instanced) {
+        checkDraw({
+          drawFunc: manyDrawArraysEmulateDrawID,
+          drawID: true,
+        });
+        checkDraw({
+          drawFunc: manyDrawElementsEmulateDrawID,
+          indexed: true,
+          drawID: true,
+        });
+      } else {
         checkDraw({
           drawFunc: manyDrawArraysInstancedEmulateDrawID,
           drawID: true,
@@ -827,8 +820,6 @@ function runTest() {
     }
   }
 
-  if (!runSupportedTest(!!multiDrawExt)) return;
-  runExtensionDependencyTests();
   runValidationTests();
   runShaderTests();
   runPixelTests();
